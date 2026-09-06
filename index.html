@@ -1,0 +1,1230 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>📊 Теннис онлайн тренер/родитель</title>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+    <!-- ✅ БЕЗОПАСНО: Конфиг загружается из внешнего файла config.js -->
+    <script src="config.js"></script>
+
+    <style>
+        /* ===== СТИЛИ ===== */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+            background: #e8f0f6;
+            padding: 12px;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+        }
+        .container {
+            max-width: 800px;
+            width: 100%;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            padding: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+        }
+        .header {
+            text-align: center;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #e2eff7;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .header .logo-wrapper { display: flex; align-items: center; gap: 10px; }
+        .header .logo-wrapper img { width: 36px; height: 36px; object-fit: contain; display: block; }
+        .header .logo-wrapper .title-group { text-align: left; }
+        .header .logo-wrapper .title-group h1 { font-size: 1.1rem; color: #0a2d3f; line-height: 1.2; }
+        .header .logo-wrapper .title-group .subtitle { font-size: 0.6rem; color: #7599ae; }
+        .badge {
+            display: inline-block;
+            padding: 2px 12px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.65rem;
+        }
+        .badge.online { background: #d4edda; color: #1d7a4a; }
+        .badge.offline { background: #f8dddd; color: #b13e3e; }
+        .badge.waiting { background: #fff3cd; color: #8a6a1a; }
+
+        .flag-icon {
+            display: inline-block;
+            width: 22px;
+            height: 16px;
+            background-size: cover;
+            background-position: center;
+            border-radius: 2px;
+            margin-right: 4px;
+            vertical-align: middle;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+            flex-shrink: 0;
+            background-color: #f0f0f0;
+            border: 1px solid #ddd;
+        }
+        /* Стиль-заглушка, если флаг не найден */
+        .flag-icon.flag-default {
+            background-image: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA5MDAgNjAwIj48cmVjdCB3aWR0aD0iOTAwIiBoZWlnaHQ9IjYwMCIgZmlsbD0iI2YwZjBmMCIvPjxjaXJjbGUgY3g9IjQ1MCIgY3k9IjMwMCIgcj0iMTUwIiBmaWxsPSIjY2NjY2NjIi8+PC9zdmc+');
+            background-size: 60% 60%;
+            background-repeat: no-repeat;
+            background-position: center;
+        }
+
+        .join-form {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            padding: 16px;
+            background: #f8faff;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            border: 2px dashed #cfe0eb;
+        }
+        .join-form .form-label {
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: #1f4b61;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .join-form .form-label .hint-icon { font-size: 0.9rem; }
+        .join-form .form-row { display: flex; gap: 8px; flex-wrap: wrap; }
+        .join-form .input-wrapper { flex: 1; position: relative; min-width: 180px; }
+        .join-form .input-wrapper input {
+            width: 100%; padding: 12px 14px 12px 45px; border-radius: 12px; border: 2px solid #cbdde8;
+            font-size: 1rem; font-weight: 700; letter-spacing: 3px; font-family: monospace; text-transform: uppercase;
+            background: white; transition: border-color 0.3s, box-shadow 0.3s; height: 52px;
+        }
+        .join-form .input-wrapper input:focus { border-color: #1d5f7a; outline: none; box-shadow: 0 0 0 3px rgba(29, 95, 122, 0.15); }
+        .join-form .input-wrapper input::placeholder { letter-spacing: 1px; font-weight: 400; color: #b0c8d8; font-family: system-ui, sans-serif; }
+        .join-form .input-wrapper .input-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: 1.2rem; color: #7599ae; pointer-events: none; }
+        .join-form .input-wrapper .input-hint { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-size: 0.55rem; color: #b0c8d8; background: #f0f5fa; padding: 2px 10px; border-radius: 12px; font-weight: 600; letter-spacing: 0.5px; font-family: system-ui, sans-serif; pointer-events: none; }
+        .join-form button {
+            padding: 12px 28px; border-radius: 12px; border: none; background: #1d5f7a; color: white; font-weight: 700;
+            font-size: 0.95rem; cursor: pointer; transition: background 0.2s, transform 0.1s; height: 52px; white-space: nowrap;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .join-form button:hover { background: #154a5e; }
+        .join-form button:active { transform: scale(0.96); }
+        .join-form button:disabled { background: #a0b8c8; cursor: not-allowed; transform: none; }
+        .join-form .help-text { font-size: 0.6rem; color: #7599ae; padding: 4px 6px; background: #eef5fa; border-radius: 8px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+        .join-form .help-text .code-example { background: white; padding: 1px 10px; border-radius: 8px; font-family: monospace; font-weight: 700; color: #1d5f7a; font-size: 0.7rem; border: 1px solid #cbdde8; letter-spacing: 2px; }
+
+        #connectionStatus { text-align: center; font-size: 0.7rem; padding: 6px; border-radius: 8px; margin-bottom: 8px; font-weight: 600; }
+        #connectionStatus.success { color: #1d7a4a; background: #d4edda; }
+        #connectionStatus.error { color: #dc3545; background: #f8dddd; }
+        #connectionStatus.waiting { color: #d4a830; background: #fff3cd; }
+        #connectionStatus.info { color: #1d5f7a; background: #d6e8f2; }
+
+        .hidden { display: none !important; }
+        .match-status { text-align: center; font-size: 0.8rem; font-weight: 600; padding: 4px 0; margin-bottom: 6px; border-radius: 12px; background: #d4edda; color: #1d7a4a; display: none; }
+        .match-status.active { display: block; background: #1d7a4a; color: white; }
+        .match-status.finished { display: block; background: #dc3545; color: white; }
+        .match-status.retired { display: block; background: #8a6a1a; color: white; }
+        .match-status.waiting { display: block; background: #fff3cd; color: #8a6a1a; }
+
+        .sets-container { display: flex; gap: 6px; flex-wrap: wrap; background: #e9f2f9; border-radius: 30px; padding: 6px 12px; margin-bottom: 12px; align-items: center; }
+        .sets-container > span { font-weight: 700; color: #0a2d3f; font-size: 0.65rem; }
+        .set-block { display: flex; align-items: center; gap: 4px; background: white; padding: 2px 8px 2px 10px; border-radius: 20px; border: 1.5px solid #cfe0eb; flex: 0 0 auto; font-size: 0.65rem; font-weight: 600; color: #0a2d3f; }
+        .set-block.active { border-color: #1d5f7a; background: #f0f8ff; box-shadow: 0 0 0 2px rgba(29, 95, 122, 0.12); }
+        .set-block .set-score { background: #e9f2f9; padding: 0 6px; border-radius: 12px; font-size: 0.7rem; }
+        .set-block .set-status { font-size: 0.5rem; padding: 1px 4px; border-radius: 12px; text-transform: uppercase; }
+        .set-block .set-status.win { background: #d4edda; color: #1d7a4a; }
+        .set-block .set-status.lose { background: #f8dddd; color: #b13e3e; }
+        .set-block .set-status.active-set { background: #d6e8f2; color: #1d5f7a; }
+        .set-block .set-status.waiting { background: #f0f0f0; color: #999; }
+        .set-block .set-status.tiebreak { background: #fff3cd; color: #8a6a1a; font-weight: 700; }
+
+        .live-panel { background: #f8faff; border-radius: 16px; padding: 12px 14px; margin-bottom: 12px; border: 1px solid #e2eff7; transition: 0.2s; border-left: 4px solid transparent; }
+        .live-panel.tiebreak-mode { border-left: 4px solid #d4a830; background: #fffcf0; }
+        .live-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+        .live-header h2 { font-size: 0.9rem; color: #0a2d3f; margin: 0; display: flex; align-items: center; gap: 6px; }
+        .live-header .game-number { background: #1d5f7a; color: white; padding: 2px 12px; border-radius: 20px; font-weight: 600; font-size: 0.7rem; }
+
+        .players-info { display: flex; justify-content: space-between; align-items: center; background: #e9f2f9; border-radius: 20px; padding: 6px 14px; margin-bottom: 6px; font-weight: 700; font-size: 0.75rem; }
+        .players-info .we { color: #1d7a4a; display: flex; align-items: center; gap: 6px; transition: 0.2s; padding: 2px 8px; border-radius: 12px; }
+        .players-info .them { color: #b13e3e; display: flex; align-items: center; gap: 6px; transition: 0.2s; padding: 2px 8px; border-radius: 12px; }
+        .players-info .serving-now { background: rgba(255, 255, 255, 0.7); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05); }
+        .players-info .player-info { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.2; }
+        .players-info .player-info .name-row { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+        .players-info .player-info .name-row .flag-icon { width: 22px; height: 16px; }
+        .players-info .player-info .details-row { font-size: 0.5rem; color: #7599ae; display: flex; gap: 10px; margin-top: 1px; }
+        .players-info .player-info .details-row .wtn, .players-info .player-info .details-row .itf { font-size: 0.7rem; color: #000000; }
+
+        .tournament-block { text-align: center; font-size: 0.7rem; font-weight: 700; color: #0a2d3f; background: #e9f2f9; padding: 2px 12px; border-radius: 30px; display: inline-block; margin: 0 auto 4px auto; letter-spacing: 1px; }
+        .tournament-block .tournament-name { background: #1d5f7a; color: white; padding: 0 12px; border-radius: 20px; }
+
+        .server-ball { display: inline-block; width: 20px; height: 20px; background-image: url('tennis.png'); background-size: contain; background-repeat: no-repeat; background-position: center; vertical-align: middle; animation: pulse 0.7s infinite alternate; margin-right: 4px; flex-shrink: 0; }
+        @keyframes pulse { 0% { transform: scale(0.9); opacity: 0.8; filter: drop-shadow(0 0 2px rgba(186, 218, 85, 0.4)); } 100% { transform: scale(1.25); opacity: 1; filter: drop-shadow(0 0 8px rgba(186, 218, 85, 0.9)); } }
+
+        .score-display { display: flex; justify-content: space-between; align-items: center; gap: 16px; background: white; border-radius: 40px; padding: 6px 16px; border: 1.5px solid #cfe0eb; margin-bottom: 8px; transition: 0.2s; }
+        .score-display.tiebreak-display { border-color: #d4a830; background: #fff8e0; }
+        .score-item { display: flex; flex-direction: column; align-items: center; min-width: 50px; }
+        .score-item .player-label { font-size: 0.5rem; text-transform: uppercase; color: #1f4b61; font-weight: 600; }
+        .score-item .score-value { font-size: 1.6rem; font-weight: 700; color: #0a2d3f; min-width: 30px; text-align: center; line-height: 1.2; }
+        .score-item.we-score-item .score-value { color: #1d7a4a; }
+        .score-item.them-score-item .score-value { color: #b13e3e; }
+        .score-divider { font-size: 1.2rem; color: #7599ae; flex-shrink: 0; }
+
+        .points-history { background: white; border-radius: 12px; padding: 4px 10px; margin-bottom: 6px; border: 1px dashed #cbdde8; min-height: 28px; display: flex; flex-direction: column; gap: 4px; }
+        .points-history .label { font-size: 0.5rem; text-transform: uppercase; color: #7599ae; font-weight: 600; }
+        .points-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+        .points-side { display: flex; flex-wrap: wrap; gap: 3px; flex: 1; }
+        .points-side.we-side { justify-content: flex-start; }
+        .points-side.them-side { justify-content: flex-end; }
+        .points-side .point-item { background: white; padding: 1px 8px; border-radius: 12px; border: 1px solid #cfe0eb; font-weight: 600; font-size: 0.6rem; color: #0a2d3f; }
+        .points-side .point-item.winner-we { background: #d4edda; border-color: #8bc9a0; color: #1d7a4a; }
+        .points-side .point-item.winner-them { background: #f8dddd; border-color: #dba8a8; color: #b13e3e; }
+        .points-side .point-item.tiebreak-point { border-color: #d4a830; background: #fff8e0; }
+        .points-divider { font-size: 0.6rem; color: #7599ae; flex-shrink: 0; }
+
+        .stats-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; margin: 8px 0 10px; }
+        .stat-card { background: white; border-radius: 10px; padding: 4px 2px; text-align: center; border: 1px solid #dfecf3; }
+        .stat-card .number { font-size: 0.9rem; font-weight: 700; color: #0a2d3f; line-height: 1.2; }
+        .stat-card .label { font-size: 0.45rem; text-transform: uppercase; color: #3d718a; line-height: 1.1; }
+        .stat-card .label small { font-size: 0.4rem; display: block; color: #7599ae; }
+        .stat-card.highlight-green { border-color: #1d7a4a; background: #d4edda; }
+        .stat-card.highlight-yellow { border-color: #d4a830; background: #f8f0d4; }
+        .stat-card.highlight-red { border-color: #b13e3e; background: #f8dddd; }
+        .stat-card.highlight-blue { border-color: #1d5f7a; background: #d6e8f2; }
+        .stat-card.highlight-gold { border-color: #d4a830; background: #fff8e0; }
+        .stat-card.highlight-time { border-color: #6c757d; background: #f8f9fa; }
+        .stat-card.highlight-break { border-color: #8a2be2; background: #f0ecf8; }
+        .stat-card.highlight-break-saved { border-color: #2e8b57; background: #e8f5ec; }
+
+        .table-wrap { background: white; border-radius: 12px; overflow-x: auto; border: 1px solid #e2eff7; padding: 2px; margin-top: 4px; max-height: 300px; overflow-y: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.6rem; min-width: 320px; }
+        th { text-align: left; padding: 4px 4px 3px 6px; font-weight: 600; color: #1f4b61; border-bottom: 1.5px solid #cde0eb; font-size: 0.5rem; text-transform: uppercase; position: sticky; top: 0; background: white; }
+        td { padding: 4px 4px 4px 6px; border-bottom: 1px solid #e4edf4; vertical-align: middle; }
+        .row-empty { text-align: center; color: #7599ae; padding: 12px; font-style: italic; font-size: 0.7rem; }
+        .badge { background: #d6e8f2; border-radius: 12px; padding: 1px 6px; font-size: 0.55rem; font-weight: 600; color: #1d5f7a; display: inline-block; }
+        .badge-tiebreak { background: #fff3cd; color: #8a6a1a; }
+        .badge-break { background: #f0ecf8; color: #8a2be2; }
+        .badge-break-saved { background: #e8f5ec; color: #2e8b57; }
+        .game-badge { border-radius: 12px; padding: 1px 8px; font-weight: 600; font-size: 0.55rem; display: inline-block; }
+        .game-badge.win { background: #d4edda; color: #1d7a4a; }
+        .game-badge.lose { background: #f8dddd; color: #b13e3e; }
+        .points-inline { display: flex; flex-wrap: wrap; gap: 2px; }
+        .points-inline .p { background: #f0f5fa; padding: 0 4px; border-radius: 8px; font-size: 0.5rem; font-weight: 500; }
+        .points-inline .p.win-we { background: #d4edda; color: #1d7a4a; }
+        .points-inline .p.win-them { background: #f8dddd; color: #b13e3e; }
+        .points-inline .p.tiebreak-p { background: #fff8e0; border: 1px solid #d4a830; }
+        .game-analysis { font-size: 0.5rem; font-weight: 600; padding: 2px 8px; border-radius: 12px; display: inline-block; white-space: nowrap; }
+        .game-analysis.easy-win { background: #d4edda; color: #1d7a4a; }
+        .game-analysis.normal { background: #fff3cd; color: #8a6a1a; }
+        .game-analysis.hard { background: #f8dddd; color: #b13e3e; }
+        .game-analysis.epic { background: #d6e8f2; color: #1d5f7a; }
+        .game-analysis.tiebreak { background: #fff8e0; color: #8a6a1a; border: 1.5px solid #d4a830; }
+        .game-analysis.break { background: #f0ecf8; color: #8a2be2; border: 1px solid #8a2be2; }
+
+        .match-history-container { margin-top: 12px; padding: 10px 14px; background: #f8faff; border-radius: 12px; border: 1px solid #e2eff7; }
+        .match-history-container h3 { font-size: 0.8rem; color: #0a2d3f; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+        .match-history-container .history-empty { color: #7599ae; font-size: 0.7rem; font-style: italic; padding: 4px 0; }
+        .match-history-list { display: flex; flex-direction: column; gap: 4px; max-height: 150px; overflow-y: auto; }
+        .match-history-item { background: white; padding: 4px 10px; border-radius: 8px; border: 1px solid #e2eff7; font-size: 0.65rem; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+        .match-history-item .match-result { font-weight: 600; color: #0a2d3f; }
+        .match-history-item .match-winner { font-weight: 700; padding: 1px 8px; border-radius: 12px; font-size: 0.6rem; }
+        .match-history-item .match-winner.win-p1 { background: #d4edda; color: #1d7a4a; }
+        .match-history-item .match-winner.win-p2 { background: #f8dddd; color: #b13e3e; }
+        .match-history-item .match-winner.win-draw { background: #fff3cd; color: #8a6a1a; }
+        .match-history-item .match-winner.win-retired { background: #fdf8f0; color: #8a6a1a; border: 1px solid #d4a830; }
+        .match-history-item .match-date { color: #7599ae; font-size: 0.55rem; }
+        .match-history-item .match-delete { color: #b13e3e; cursor: pointer; font-weight: 700; font-size: 0.6rem; padding: 0 4px; }
+        .clear-history-btn { margin-top: 6px; font-size: 0.6rem; padding: 2px 10px; background: #b13e3e20; border-color: #dba8a8; color: #852f2f; border: 1.5px solid #dba8a8; border-radius: 20px; cursor: pointer; }
+
+        .footer-tip { font-size: 0.55rem; color: #547d94; margin-top: 8px; padding-top: 6px; border-top: 1px solid #d7e6f0; display: flex; justify-content: center; flex-wrap: wrap; gap: 4px 10px; }
+        .footer-tip .legend { display: flex; gap: 8px; flex-wrap: wrap; }
+        .footer-tip .legend span { display: flex; align-items: center; gap: 3px; }
+        .footer-tip .legend .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
+        .footer-tip .legend .dot.green { background: #1d7a4a; }
+        .footer-tip .legend .dot.yellow { background: #d4a830; }
+        .footer-tip .legend .dot.red { background: #b13e3e; }
+        .footer-tip .legend .dot.blue { background: #1d5f7a; }
+        .footer-tip .legend .dot.gold { background: #d4a830; border: 1.5px solid #b8960f; }
+        .footer-tip .legend .dot.retired { background: #8a6a1a; }
+        .footer-tip .legend .dot.break { background: #8a2be2; }
+        .footer-tip .legend .dot.break-saved { background: #2e8b57; }
+
+        .timer-display { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; font-weight: 600; color: #0a2d3f; padding: 2px 12px; background: #e9f2f9; border-radius: 20px; }
+        .timer-display .timer-icon { font-size: 0.9rem; }
+        .timer-display #timer { font-size: 0.9rem; font-weight: 700; color: #1d5f7a; font-variant-numeric: tabular-nums; min-width: 50px; display: inline-block; text-align: center; }
+
+        @media (max-width: 600px) { .stats-grid { grid-template-columns: repeat(3, 1fr); } }
+        @media (max-width: 500px) {
+            .stats-grid { grid-template-columns: repeat(3, 1fr); }
+            .score-display .player-label { font-size: 0.4rem; }
+            .score-item .score-value { font-size: 1.2rem; }
+            .join-form .form-row { flex-direction: column; }
+            .join-form .input-wrapper { min-width: unset; }
+            .join-form button { width: 100%; justify-content: center; }
+            .join-form .input-wrapper input { height: 48px; font-size: 0.9rem; padding-left: 40px; }
+            .join-form .input-wrapper .input-hint { display: none; }
+            .header .logo-wrapper img { width: 28px; height: 28px; }
+            .header .logo-wrapper .title-group h1 { font-size: 0.9rem; }
+            .timer-display { font-size: 0.7rem; }
+            .timer-display #timer { font-size: 0.8rem; min-width: 40px; }
+        }
+        @media (max-width: 380px) {
+            .join-form .input-wrapper input { font-size: 0.8rem; padding: 10px 12px 10px 36px; height: 44px; letter-spacing: 2px; }
+            .join-form .input-wrapper .input-icon { font-size: 1rem; left: 10px; }
+            .join-form button { height: 44px; font-size: 0.85rem; padding: 8px 16px; }
+            .header .logo-wrapper img { width: 24px; height: 24px; }
+            .header .logo-wrapper .title-group h1 { font-size: 0.8rem; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <div class="logo-wrapper">
+            <img src="logo.png" alt="Логотип" id="logoImage">
+            <div class="title-group">
+                <h1>Теннис онлайн <span style="font-size:0.9rem;font-weight:400;color:#000000;">тренер/родитель</span></h1>
+                <div class="subtitle">
+                    <span id="statusDot" class="badge offline">● Отключено</span>
+                    <span id="matchIdDisplay" style="margin-left:8px;font-weight:700;color:#1d5f7a;"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="join-form">
+        <div class="form-label">
+            <span class="hint-icon">🔑</span> 
+           <p style="color: black;">Введите код матча, чтобы подключиться к трансляции</p>
+        </div>
+        <div class="form-row">
+            <div class="input-wrapper">
+                <span class="input-icon">📋</span>
+                <input
+                    type="text"
+                    id="matchIdInput"
+                    placeholder="Например: Z3D38J"
+                    maxlength="6"
+                    autocomplete="off"
+                    spellcheck="false"
+                >
+                <span class="input-hint">6 символов</span>
+            </div>
+            <button id="connectBtn">🔗 Подключиться</button>
+        </div>
+        <div class="help-text">
+            <span style="margin-left:auto;font-size:0.9rem;color:#FF0000;"> 💡 <strong>Как получить код?</strong>
+            <br>
+            <p style="color: black;">Код выдаёт родитель или сопровождающий игрока на матче. Введите его в поле выше (6 символов, например
+            <span class="code-example">Z3D38J</span>) и нажмите "Подключиться".
+            <br>
+            <span style="margin-left:auto;font-size:0.55rem;color:#000000;">⚡ Данные в реальном времени</span>
+        </div>
+    </div>
+
+    <div id="connectionStatus" class="info"> <p style="color: black;">📌 Введите код матча и нажмите "Подключиться"</p></div>
+
+    <div id="matchContent" class="hidden">
+        <div id="matchStatus" class="match-status waiting">⏳ Ожидание начала матча...</div>
+
+        <div style="text-align:center;margin-bottom:8px;">
+            <span class="tournament-block">
+                🏆 Турнир: <span id="tournamentDisplay" class="tournament-name">GSPD</span>
+            </span>
+        </div>
+
+        <div class="timer-display" style="margin: 4px 0 8px 0;">
+            <span class="timer-icon">⏱️</span>
+            <span>Время матча:</span>
+            <span id="timer">00:00</span>
+        </div>
+
+        <div class="sets-container" id="setsContainer">
+            <span>Сеты</span>
+            <div class="set-block active" id="set1Block">
+                <span class="set-label">1</span>
+                <span class="set-score" id="set1Score">0:0</span>
+                <span class="set-status active-set" id="set1Status">▶</span>
+            </div>
+            <div class="set-block" id="set2Block">
+                <span class="set-label">2</span>
+                <span class="set-score" id="set2Score">0:0</span>
+                <span class="set-status waiting" id="set2Status">⏳</span>
+            </div>
+            <div class="set-block" id="set3Block">
+                <span class="set-label">3</span>
+                <span class="set-score" id="set3Score">0:0</span>
+                <span class="set-status waiting" id="set3Status">⏳</span>
+            </div>
+            <span id="tiebreakInfo" style="font-size:0.6rem;color:#8a6a1a;font-weight:600;display:none;">⚡ Тай-брейк!</span>
+        </div>
+
+        <div class="live-panel" id="livePanel">
+            <div class="live-header">
+                <h2><span id="gameTypeLabel">Матч</span></h2>
+                <span class="game-number" id="currentGameNumber">#0</span>
+            </div>
+
+            <div class="players-info">
+                <span class="we" id="labelWe">
+                    <span class="server-ball" id="ballWe" style="display:none;"></span>
+                    <span class="player-info">
+                        <span class="name-row">
+                            <span class="flag-icon flag-default" id="gameP1Flag"></span>
+                            <span id="playerNameDisplay">Игрок 1</span>
+                            <span class="details-row">
+                                <span class="wtn" id="gameP1Wtn">WTN: --</span>
+                                <span class="itf" id="gameP1Itf">ITF: --</span>
+                            </span>
+                        </span>
+                    </span>
+                </span>
+                <span style="color:#7599ae;">VS</span>
+                <span class="them" id="labelThem">
+                    <span class="player-info" style="align-items:flex-end;">
+                        <span class="name-row">
+                            <span class="flag-icon flag-default" id="gameP2Flag"></span>
+                            <span id="opponentNameText">Игрок 2</span>
+                            <span class="details-row">
+                                <span class="wtn" id="gameP2Wtn">WTN: --</span>
+                                <span class="itf" id="gameP2Itf">ITF: --</span>
+                            </span>
+                        </span>
+                    </span>
+                    <span class="server-ball" id="ballThem" style="display:none;"></span>
+                </span>
+            </div>
+
+            <div class="score-display" id="scoreDisplay">
+                <div class="score-item we-score-item">
+                    <span class="player-label" id="labelWeScore">Игрок 1</span>
+                    <span class="score-value we-score" id="player1Score">0</span>
+                </div>
+                <span class="score-divider">:</span>
+                <div class="score-item them-score-item">
+                    <span class="player-label" id="scoreLabelThem">Игрок 2</span>
+                    <span class="score-value them-score" id="player2Score">0</span>
+                </div>
+            </div>
+
+            <div class="points-history">
+                <div class="label" id="pointsLabel">📝 Розыгрыши:</div>
+                <div class="points-row">
+                    <div class="points-side we-side" id="wePointsList">
+                        <span style="color:#7599ae;font-size:0.55rem;">Нет</span>
+                    </div>
+                    <span class="points-divider">|</span>
+                    <div class="points-side them-side" id="themPointsList">
+                        <span style="color:#7599ae;font-size:0.55rem;">Нет</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="stats-grid" id="statsGrid">
+            <div class="stat-card highlight-blue">
+                <div class="number" id="statGames">0</div>
+                <div class="label">Геймов</div>
+            </div>
+            <div class="stat-card">
+                <div class="number" id="statP1Games">0</div>
+                <div class="label" id="statP1Label">Игрок 1</div>
+            </div>
+            <div class="stat-card">
+                <div class="number" id="statP2Games">0</div>
+                <div class="label" id="statP2Label">Игрок 2</div>
+            </div>
+            <div class="stat-card highlight-time">
+                <div class="number" id="statDuration">00:00</div>
+                <div class="label">Время матча</div>
+            </div>
+            <div class="stat-card">
+                <div class="number" id="statAvgPoints">0.0</div>
+                <div class="label">Сред. очк.</div>
+            </div>
+            <div class="stat-card highlight-green">
+                <div class="number" id="statShort">0</div>
+                <div class="label">Короткие<br><small>≤4 очка</small></div>
+            </div>
+            <div class="stat-card highlight-yellow">
+                <div class="number" id="statMedium">0</div>
+                <div class="label">Средние<br><small>5-6 очков</small></div>
+            </div>
+            <div class="stat-card highlight-red">
+                <div class="number" id="statLong">0</div>
+                <div class="label">Длинные<br><small>7-9 очков</small></div>
+            </div>
+            <div class="stat-card highlight-blue" style="border-color:#1d5f7a; background:#d6e8f2;">
+                <div class="number" id="statEpic">0</div>
+                <div class="label">Эпичные<br><small>≥10 очков</small></div>
+            </div>
+            <div class="stat-card highlight-gold">
+                <div class="number" id="statAce">0</div>
+                <div class="label">Эйсы (Ace)</div>
+            </div>
+            <div class="stat-card highlight-gold" style="background:#eafaf1; border-color:#2a7a74; color:#2a7a74;">
+                <div class="number" id="statWinner">0</div>
+                <div class="label">Winners 🔥</div>
+            </div>
+            <div class="stat-card highlight-red">
+                <div class="number" id="statDf">0</div>
+                <div class="label">Дв. ошибки</div>
+            </div>
+            <div class="stat-card highlight-yellow">
+                <div class="number" id="statUe">0</div>
+                <div class="label">Невынужденные ошибки</div>
+            </div>
+            <div class="stat-card highlight-gold" style="border-color: #d4a830; background: #fff8e0;">
+                <div class="number" id="statTiebreak">0</div>
+                <div class="label">Тай-брейки</div>
+            </div>
+            <div class="stat-card highlight-red">
+                <div class="number" id="statFault1">0</div>
+                <div class="label">Ошибки<br><small>1-я подача</small></div>
+            </div>
+            <div class="stat-card highlight-green" style="border-color:#1d7a4a; background:#d4edda;">
+                <div class="number" id="statServe1">0</div>
+                <div class="label">1-я подача<br><small>успешные</small></div>
+            </div>
+            <div class="stat-card highlight-green" style="border-color:#1d7a4a; background:#d4edda;">
+                <div class="number" id="statServe2">0</div>
+                <div class="label">2-я подача<br><small>успешные</small></div>
+            </div>
+            <div class="stat-card highlight-break-saved">
+                <div class="number" id="statBPSaved">0</div>
+                <div class="label">Брейк-поинты<br><small>отыграл Игрок 1</small></div>
+            </div>
+            <div class="stat-card highlight-break">
+                <div class="number" id="statBreaks">0</div>
+                <div class="label">Брейканул(а)<br><small>Игрок 1</small></div>
+            </div>
+            <div class="stat-card highlight-break-saved" style="border-color:#2e8b57; background:#e8f5ec;">
+                <div class="number" id="statBPSavedP2">0</div>
+                <div class="label">Брейк-поинты<br><small>отыграл Игрок 2</small></div>
+            </div>
+            <div class="stat-card highlight-break" style="border-color:#8a2be2; background:#f0ecf8;">
+                <div class="number" id="statBreaksP2">0</div>
+                <div class="label">Брейканул(а)<br><small>Игрок 2</small></div>
+            </div>
+        </div>
+
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>#</th><th>Сет</th><th>Поб.</th><th>Счёт</th><th>Розыгрыши</th><th>Анализ</th></tr></thead>
+                <tbody id="historyTableBody"><tr><td colspan="6" class="row-empty">Нет данных</td></tr></tbody>
+            </table>
+        </div>
+
+        <div class="match-history-container">
+            <h3>📋 История матчей</h3>
+            <div id="matchHistoryList" class="match-history-list">
+                <div class="history-empty">Нет завершенных матчей</div>
+            </div>
+            <button class="clear-history-btn" id="clearHistoryBtn">🗑 Очистить историю</button>
+        </div>
+
+        <div class="footer-tip">
+            <div class="legend">
+                <span><span class="dot green"></span> Лёгкий</span>
+                <span><span class="dot yellow"></span> Средний</span>
+                <span><span class="dot red"></span> Тяжёлый</span>
+                <span><span class="dot blue"></span> Эпичный</span>
+                <span><span class="dot gold"></span> Тай-брейк</span>
+                <span><span class="dot retired"></span> Снятие (Ret)</span>
+                <span><span class="dot break"></span> Брейк</span>
+                <span><span class="dot break-saved"></span> Брейк-поинт отыгран</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// ============================================
+// 🔥 КОНФИГУРАЦИЯ FIREBASE ЗАГРУЖАЕТСЯ ИЗ config.js
+// ============================================
+
+// ✅ БЕЗОПАСНО: Все настройки Firebase теперь в config.js
+// Этот файл НЕ СОДЕРЖИТ секретов!
+
+let firebaseInitialized = false;
+try {
+    // Используем конфиг из внешнего файла
+    // (переменная FIREBASE_CONFIG определена в config.js)
+    if (typeof FIREBASE_CONFIG !== 'undefined') {
+        firebase.initializeApp(FIREBASE_CONFIG);
+        firebaseInitialized = true;
+        console.log('✅ Firebase подключён через внешний конфиг');
+    } else {
+        console.warn('⚠️ FIREBASE_CONFIG не найден. Проверьте config.js');
+        alert('⚠️ Ошибка: файл config.js не загружен. Проверьте наличие файла.');
+    }
+} catch (e) {
+    console.warn('⚠️ Ошибка Firebase:', e.message);
+    alert('⚠️ Ошибка подключения к Firebase. Проверьте config.js.');
+}
+
+const database = firebaseInitialized ? firebase.database() : null;
+
+// ============================================
+// СОСТОЯНИЕ
+// ============================================
+
+let matchId = null;
+let matchRef = null;
+let isListening = false;
+let matchData = null;
+let startTime = null;
+let timerInterval = null;
+
+const matchIdInput = document.getElementById('matchIdInput');
+const connectBtn = document.getElementById('connectBtn');
+const connectionStatus = document.getElementById('connectionStatus');
+const statusDot = document.getElementById('statusDot');
+const matchIdDisplay = document.getElementById('matchIdDisplay');
+const matchContent = document.getElementById('matchContent');
+
+// ============================================
+// ФУНКЦИИ ДЛЯ ФЛАГОВ (ЗАГРУЗКА ИЗ images/НАЗВАНИЕ_СТРАНЫ.svg)
+// ============================================
+
+function getFlagUrl(countryCode) {
+    if (!countryCode) return 'images/default.svg';
+    // Приводим к нижнему регистру и берем первые 2 символа
+    var code = countryCode.toLowerCase().trim();
+    // Если код состоит из 2 букв — используем его как имя файла
+    if (code.length === 2) {
+        return 'images/' + code + '.svg';
+    }
+    // Если это код UK → преобразуем в gb (стандарт)
+    if (code === 'uk') return 'images/gb.svg';
+    // Если код не 2 буквы, пробуем взять первые 2
+    var short = code.slice(0, 2);
+    return 'images/' + short + '.svg';
+}
+
+function updateFlag(elementId, countryCode) {
+    var el = document.getElementById(elementId);
+    if (!el) return;
+    var url = getFlagUrl(countryCode);
+    // Пробуем загрузить флаг
+    el.style.backgroundImage = "url('" + url + "')";
+    // Убираем класс flag-default, чтобы не перекрывался background-image
+    el.className = 'flag-icon';
+    // Добавляем обработчик ошибки загрузки
+    el.onerror = function() {
+        this.style.backgroundImage = "url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA5MDAgNjAwIj48cmVjdCB3aWR0aD0iOTAwIiBoZWlnaHQ9IjYwMCIgZmlsbD0iI2YwZjBmMCIvPjxjaXJjbGUgY3g9IjQ1MCIgY3k9IjMwMCIgcj0iMTUwIiBmaWxsPSIjY2NjY2NjIi8+PC9zdmc+')";
+        this.className = 'flag-icon flag-default';
+    };
+}
+
+// ============================================
+// ПОДКЛЮЧЕНИЕ
+// ============================================
+
+connectBtn.addEventListener('click', function() {
+    var input = matchIdInput.value.trim().toUpperCase();
+    if (!input) {
+        connectionStatus.textContent = '⚠️ Введите код матча (6 символов)';
+        connectionStatus.className = 'error';
+        matchIdInput.focus();
+        matchIdInput.style.borderColor = '#dc3545';
+        setTimeout(function() { matchIdInput.style.borderColor = ''; }, 2000);
+        return;
+    }
+    if (input.length !== 6) {
+        connectionStatus.textContent = '⚠️ Код должен состоять из 6 символов (например: Z3D38J)';
+        connectionStatus.className = 'error';
+        matchIdInput.focus();
+        matchIdInput.style.borderColor = '#dc3545';
+        setTimeout(function() { matchIdInput.style.borderColor = ''; }, 2000);
+        return;
+    }
+
+    matchId = input;
+    matchIdDisplay.textContent = '📌 ' + input;
+    matchRef = database.ref('matches/' + input);
+
+    connectionStatus.textContent = '⏳ Подключение к матчу ' + input + '...';
+    connectionStatus.className = 'waiting';
+    statusDot.className = 'badge waiting';
+    statusDot.textContent = '⏳ Подключение...';
+    connectBtn.disabled = true;
+    connectBtn.textContent = '⏳ Подключение...';
+
+    matchRef.once('value')
+        .then(function(snapshot) {
+            connectBtn.disabled = false;
+            connectBtn.textContent = '🔗 Подключиться';
+
+            if (!snapshot.exists()) {
+                connectionStatus.textContent = '❌ Матч с кодом "' + input + '" не найден. Проверьте правильность кода.';
+                connectionStatus.className = 'error';
+                statusDot.className = 'badge offline';
+                statusDot.textContent = '● Ошибка';
+                matchIdDisplay.textContent = '❌ ' + input;
+                return;
+            }
+
+            connectionStatus.textContent = '✅ Подключено к матчу ' + input + '! Данные обновляются в реальном времени';
+            connectionStatus.className = 'success';
+            statusDot.className = 'badge online';
+            statusDot.textContent = '● Онлайн';
+            matchIdDisplay.textContent = '✅ ' + input;
+            matchContent.classList.remove('hidden');
+
+            startListening();
+        })
+        .catch(function(err) {
+            connectBtn.disabled = false;
+            connectBtn.textContent = '🔗 Подключиться';
+            connectionStatus.textContent = '❌ Ошибка: ' + err.message;
+            connectionStatus.className = 'error';
+            statusDot.className = 'badge offline';
+            statusDot.textContent = '● Ошибка';
+        });
+});
+
+matchIdInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') connectBtn.click();
+});
+
+matchIdInput.addEventListener('input', function() {
+    this.value = this.value.toUpperCase();
+    if (this.value.length > 6) {
+        this.value = this.value.slice(0, 6);
+    }
+    this.style.borderColor = '';
+    if (connectionStatus.classList.contains('error')) {
+        connectionStatus.textContent = '📌 Введите код матча и нажмите "Подключиться"';
+        connectionStatus.className = 'info';
+    }
+});
+
+// ============================================
+// ПРОСЛУШИВАНИЕ FIREBASE
+// ============================================
+
+function startListening() {
+    if (isListening) return;
+    isListening = true;
+
+    matchRef.on('value', function(snapshot) {
+        var data = snapshot.val();
+        if (data) {
+            matchData = data;
+            console.log('📥 Получены данные из Firebase:', data);
+            updateUI(data);
+        }
+    }, function(error) {
+        console.error('Ошибка прослушивания:', error);
+        connectionStatus.textContent = '⚠️ Потеря соединения...';
+        connectionStatus.className = 'waiting';
+    });
+}
+
+// ============================================
+// ОБНОВЛЕНИЕ ИНТЕРФЕЙСА
+// ============================================
+
+var tennisMap = { 0: '0', 1: '15', 2: '30', 3: '40', 4: 'AD' };
+var revTennisMap = { '0': 0, '15': 1, '30': 2, '40': 3, 'AD': 4 };
+
+function updateTimerDisplay() {
+    if (!startTime) return;
+    var now = new Date();
+    var diff = Math.floor((now - startTime) / 1000);
+    var minutes = Math.floor(diff / 60);
+    var seconds = diff % 60;
+    var timeString = String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
+    var timerEl = document.getElementById('timer');
+    var durationStat = document.getElementById('statDuration');
+    if (timerEl) timerEl.textContent = timeString;
+    if (durationStat) durationStat.textContent = timeString;
+}
+
+function updateUI(data) {
+    if (!data) {
+        console.warn('⚠️ Нет данных для обновления');
+        return;
+    }
+
+    console.log('📊 Обновление UI с данными:', data);
+
+    var p1Name = data.player1 || 'Игрок 1';
+    var p2Name = data.player2 || 'Игрок 2';
+    var p1Wtn = data.wtn1 || '';
+    var p2Wtn = data.wtn2 || '';
+    var p1Itf = data.itf1 || '';
+    var p2Itf = data.itf2 || '';
+    var tournament = data.tournament || 'GSPD';
+    var p1Flag = data.flag1 || '';
+    var p2Flag = data.flag2 || '';
+
+    var tournamentDisplay = document.getElementById('tournamentDisplay');
+    if (tournamentDisplay) tournamentDisplay.textContent = tournament;
+
+    var gameTypeLabel = document.getElementById('gameTypeLabel');
+    if (gameTypeLabel) gameTypeLabel.textContent = 'Матч';
+
+    var playerNameDisplay = document.getElementById('playerNameDisplay');
+    var opponentNameText = document.getElementById('opponentNameText');
+    var gameP1Wtn = document.getElementById('gameP1Wtn');
+    var gameP2Wtn = document.getElementById('gameP2Wtn');
+    var gameP1Itf = document.getElementById('gameP1Itf');
+    var gameP2Itf = document.getElementById('gameP2Itf');
+
+    if (playerNameDisplay) playerNameDisplay.textContent = p1Name;
+    if (opponentNameText) opponentNameText.textContent = p2Name;
+    if (gameP1Wtn) gameP1Wtn.textContent = p1Wtn ? 'WTN: ' + p1Wtn : 'WTN: --';
+    if (gameP2Wtn) gameP2Wtn.textContent = p2Wtn ? 'WTN: ' + p2Wtn : 'WTN: --';
+    if (gameP1Itf) gameP1Itf.textContent = p1Itf ? 'ITF: ' + p1Itf : 'ITF: --';
+    if (gameP2Itf) gameP2Itf.textContent = p2Itf ? 'ITF: ' + p2Itf : 'ITF: --';
+
+    // Обновление флагов из images/
+    updateFlag('gameP1Flag', p1Flag);
+    updateFlag('gameP2Flag', p2Flag);
+
+    var s1 = data.sets?.[1] || { p1: 0, p2: 0 };
+    var s2 = data.sets?.[2] || { p1: 0, p2: 0 };
+    var s3 = data.sets?.[3] || { p1: 0, p2: 0 };
+
+    var set1Score = document.getElementById('set1Score');
+    var set2Score = document.getElementById('set2Score');
+    var set3Score = document.getElementById('set3Score');
+
+    if (set1Score) set1Score.textContent = s1.p1 + ':' + s1.p2;
+    if (set2Score) set2Score.textContent = s2.p1 + ':' + s2.p2;
+    if (set3Score) set3Score.textContent = s3.p1 + ':' + s3.p2;
+
+    var currentSet = data.currentSet || 1;
+    var setStatuses = ['set1Status', 'set2Status', 'set3Status'];
+    var setBlocks = ['set1Block', 'set2Block', 'set3Block'];
+
+    for (var i = 0; i < setStatuses.length; i++) {
+        var el = document.getElementById(setStatuses[i]);
+        var block = document.getElementById(setBlocks[i]);
+        if (!el || !block) continue;
+        block.classList.remove('active');
+        if (i + 1 === currentSet && !data.isMatchFinished) {
+            block.classList.add('active');
+            if (data.isTiebreak) {
+                el.textContent = '⚡';
+                el.className = 'set-status tiebreak';
+            } else {
+                el.textContent = '▶';
+                el.className = 'set-status active-set';
+            }
+        } else if (i + 1 < currentSet || data.isMatchFinished) {
+            var setData = data.sets?.[i + 1];
+            if (setData && setData.p1 > setData.p2) {
+                el.textContent = '✅';
+                el.className = 'set-status win';
+            } else if (setData && setData.p2 > setData.p1) {
+                el.textContent = '❌';
+                el.className = 'set-status lose';
+            } else {
+                el.textContent = '⏳';
+                el.className = 'set-status waiting';
+            }
+        }
+    }
+
+    var statusEl = document.getElementById('matchStatus');
+    if (statusEl) {
+        if (data.isMatchFinished) {
+            statusEl.className = 'match-status finished';
+            var winner = data.winner === 1 ? data.player1 : data.player2;
+            statusEl.textContent = '🏁 Матч завершён! Победитель: ' + (winner || 'Неизвестно');
+            statusEl.style.display = 'block';
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+        } else if (data.status === 'active') {
+            statusEl.className = 'match-status active';
+            statusEl.textContent = '🏟️ Матч в процессе...';
+            statusEl.style.display = 'block';
+        } else {
+            statusEl.className = 'match-status waiting';
+            statusEl.textContent = '⏳ Ожидание начала матча...';
+            statusEl.style.display = 'block';
+        }
+    }
+
+    var game = data.currentGame || { p1: 0, p2: 0, isTiebreak: false, serve: 1 };
+    var gameNumber = data.gameNumber || 0;
+    var currentGameNumberEl = document.getElementById('currentGameNumber');
+    if (currentGameNumberEl) currentGameNumberEl.textContent = '#' + gameNumber;
+
+    var player1Score = document.getElementById('player1Score');
+    var player2Score = document.getElementById('player2Score');
+    var labelWeScore = document.getElementById('labelWeScore');
+    var scoreLabelThem = document.getElementById('scoreLabelThem');
+
+    if (player1Score) player1Score.textContent = game.isTiebreak ? game.p1 : (tennisMap[game.p1] || game.p1);
+    if (player2Score) player2Score.textContent = game.isTiebreak ? game.p2 : (tennisMap[game.p2] || game.p2);
+    if (labelWeScore) labelWeScore.textContent = data.player1 || 'Игрок 1';
+    if (scoreLabelThem) scoreLabelThem.textContent = data.player2 || 'Игрок 2';
+
+    var tiebreakInfo = document.getElementById('tiebreakInfo');
+    var scoreDisplay = document.getElementById('scoreDisplay');
+    var pointsLabel = document.getElementById('pointsLabel');
+    var livePanel = document.getElementById('livePanel');
+
+    if (game.isTiebreak) {
+        if (tiebreakInfo) tiebreakInfo.style.display = 'inline';
+        if (livePanel) livePanel.classList.add('tiebreak-mode');
+        if (scoreDisplay) scoreDisplay.classList.add('tiebreak-display');
+        if (pointsLabel) pointsLabel.textContent = '📝 Очки тай-брейка:';
+    } else {
+        if (tiebreakInfo) tiebreakInfo.style.display = 'none';
+        if (livePanel) livePanel.classList.remove('tiebreak-mode');
+        if (scoreDisplay) scoreDisplay.classList.remove('tiebreak-display');
+        if (pointsLabel) pointsLabel.textContent = '📝 Розыгрыши:';
+    }
+
+    var ballWe = document.getElementById('ballWe');
+    var ballThem = document.getElementById('ballThem');
+    var labelWe = document.getElementById('labelWe');
+    var labelThem = document.getElementById('labelThem');
+
+    if (game.serve === 1) {
+        if (ballWe) ballWe.style.display = 'inline-block';
+        if (ballThem) ballThem.style.display = 'none';
+        if (labelWe) labelWe.classList.add('serving-now');
+        if (labelThem) labelThem.classList.remove('serving-now');
+    } else if (game.serve === 2) {
+        if (ballWe) ballWe.style.display = 'none';
+        if (ballThem) ballThem.style.display = 'inline-block';
+        if (labelWe) labelWe.classList.remove('serving-now');
+        if (labelThem) labelThem.classList.add('serving-now');
+    } else {
+        if (ballWe) ballWe.style.display = 'none';
+        if (ballThem) ballThem.style.display = 'none';
+        if (labelWe) labelWe.classList.remove('serving-now');
+        if (labelThem) labelThem.classList.remove('serving-now');
+    }
+
+    updatePointsDisplay(data);
+
+    var stats = data.stats || { p1: {}, p2: {} };
+    var p1 = stats.p1 || {};
+    var p2 = stats.p2 || {};
+
+    var statGames = document.getElementById('statGames');
+    var statP1Games = document.getElementById('statP1Games');
+    var statP2Games = document.getElementById('statP2Games');
+    var statP1Label = document.getElementById('statP1Label');
+    var statP2Label = document.getElementById('statP2Label');
+
+    if (statGames) statGames.textContent = (p1.games || 0) + (p2.games || 0);
+    if (statP1Games) statP1Games.textContent = p1.games || 0;
+    if (statP2Games) statP2Games.textContent = p2.games || 0;
+    if (statP1Label) statP1Label.textContent = data.player1 || 'Игрок 1';
+    if (statP2Label) statP2Label.textContent = data.player2 || 'Игрок 2';
+
+    var history = data.history || [];
+    var short = 0, medium = 0, long = 0, epic = 0, tiebreaks = 0;
+    var totalPoints = 0;
+    for (var h = 0; h < history.length; h++) {
+        var item = history[h];
+        var pts = item.points ? item.points.length : 0;
+        totalPoints += pts;
+        if (item.isTiebreak) tiebreaks++;
+        else if (pts <= 4) short++;
+        else if (pts <= 6) medium++;
+        else if (pts <= 9) long++;
+        else epic++;
+    }
+
+    var statShort = document.getElementById('statShort');
+    var statMedium = document.getElementById('statMedium');
+    var statLong = document.getElementById('statLong');
+    var statEpic = document.getElementById('statEpic');
+    var statTiebreak = document.getElementById('statTiebreak');
+    var statAvgPoints = document.getElementById('statAvgPoints');
+
+    if (statShort) statShort.textContent = short;
+    if (statMedium) statMedium.textContent = medium;
+    if (statLong) statLong.textContent = long;
+    if (statEpic) statEpic.textContent = epic;
+    if (statTiebreak) statTiebreak.textContent = tiebreaks;
+    if (statAvgPoints) statAvgPoints.textContent = history.length > 0 ? (totalPoints / history.length).toFixed(1) : '0.0';
+
+    var statAce = document.getElementById('statAce');
+    var statWinner = document.getElementById('statWinner');
+    var statDf = document.getElementById('statDf');
+    var statUe = document.getElementById('statUe');
+    var statFault1 = document.getElementById('statFault1');
+    var statServe1 = document.getElementById('statServe1');
+    var statServe2 = document.getElementById('statServe2');
+    var statBPSaved = document.getElementById('statBPSaved');
+    var statBPSavedP2 = document.getElementById('statBPSavedP2');
+    var statBreaks = document.getElementById('statBreaks');
+    var statBreaksP2 = document.getElementById('statBreaksP2');
+
+    if (statAce) statAce.textContent = (p1.ace || 0) + (p2.ace || 0);
+    if (statWinner) statWinner.textContent = (p1.winner || 0) + (p2.winner || 0);
+    if (statDf) statDf.textContent = (p1.df || 0) + (p2.df || 0);
+    if (statUe) statUe.textContent = (p1.ue || 0) + (p2.ue || 0);
+    if (statFault1) statFault1.textContent = (p1.fault1 || 0) + (p2.fault1 || 0);
+    if (statServe1) statServe1.textContent = (p1.serve1 || 0) + (p2.serve1 || 0);
+    if (statServe2) statServe2.textContent = (p1.serve2 || 0) + (p2.serve2 || 0);
+    if (statBPSaved) statBPSaved.textContent = p1.breakPointsSaved || 0;
+    if (statBPSavedP2) statBPSavedP2.textContent = p2.breakPointsSaved || 0;
+    if (statBreaks) statBreaks.textContent = p1.breaks || 0;
+    if (statBreaksP2) statBreaksP2.textContent = p2.breaks || 0;
+
+    var timerEl = document.getElementById('timer');
+    var durationStat = document.getElementById('statDuration');
+    if (data.duration !== undefined && data.duration !== null) {
+        var timeString = data.duration;
+        if (timerEl) timerEl.textContent = timeString;
+        if (durationStat) durationStat.textContent = timeString;
+    }
+
+    renderHistoryTable(history);
+
+    console.log('✅ UI обновлен успешно');
+}
+
+function updatePointsDisplay(data) {
+    var game = data.currentGame || { p1: 0, p2: 0, isTiebreak: false };
+    var gamePoints = data.gamePoints || [];
+    var pointMetadata = data.pointMetadata || [];
+
+    var wePoints = [], themPoints = [];
+    var p1Prev = 0, p2Prev = 0;
+
+    for (var i = 0; i < gamePoints.length; i++) {
+        var p = gamePoints[i];
+        var parts = p.split('/');
+        if (parts.length === 2) {
+            var p1Current, p2Current;
+            var meta = pointMetadata[i] ? ' [' + pointMetadata[i].toUpperCase() + ']' : '';
+
+            if (game.isTiebreak) {
+                p1Current = parseInt(parts[0], 10);
+                p2Current = parseInt(parts[1], 10);
+            } else {
+                p1Current = revTennisMap[parts[0]] !== undefined ? revTennisMap[parts[0]] : parseInt(parts[0], 10);
+                p2Current = revTennisMap[parts[1]] !== undefined ? revTennisMap[parts[1]] : parseInt(parts[1], 10);
+            }
+
+            var isWePoint = false;
+            if (p1Current > p1Prev) isWePoint = true;
+            else if (p2Current > p2Prev) isWePoint = false;
+            else if (p1Current === 3 && p2Current === 3) {
+                if (p2Prev === 4) isWePoint = true;
+                else if (p1Prev === 4) isWePoint = false;
+            }
+
+            var display = game.isTiebreak ? p1Current + '/' + p2Current : (tennisMap[p1Current] || p1Current) + '/' + (tennisMap[p2Current] || p2Current);
+            var cls = game.isTiebreak ? ' tiebreak-point' : '';
+
+            if (isWePoint) {
+                wePoints.push({ text: display + meta, cls: 'winner-we' + cls });
+            } else {
+                themPoints.push({ text: display + meta, cls: 'winner-them' + cls });
+            }
+
+            p1Prev = p1Current;
+            p2Prev = p2Current;
+        }
+    }
+
+    var weList = document.getElementById('wePointsList');
+    var themList = document.getElementById('themPointsList');
+
+    if (weList) {
+        weList.innerHTML = wePoints.length === 0 ?
+            '<span style="color:#7599ae;font-size:0.55rem;">Нет</span>' :
+            wePoints.map(function(p) { return '<span class="point-item ' + p.cls + '">' + p.text + '</span>'; }).join('');
+    }
+
+    if (themList) {
+        themList.innerHTML = themPoints.length === 0 ?
+            '<span style="color:#7599ae;font-size:0.55rem;">Нет</span>' :
+            themPoints.map(function(p) { return '<span class="point-item ' + p.cls + '">' + p.text + '</span>'; }).join('');
+    }
+}
+
+function renderHistoryTable(history) {
+    var tbody = document.getElementById('historyTableBody');
+    if (!tbody) return;
+
+    if (!history || history.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="row-empty">Нет данных</td></tr>';
+        return;
+    }
+
+    var html = '';
+
+    for (var i = 0; i < history.length; i++) {
+        var rec = history[i];
+        var total = rec.points ? rec.points.length : 0;
+
+        var pointsHtml = '<div class="points-inline">';
+        var p1Prev = 0, p2Prev = 0;
+
+        if (rec.points) {
+            for (var j = 0; j < rec.points.length; j++) {
+                var p = rec.points[j];
+                var parts = p.split('/');
+                if (parts.length === 2) {
+                    var p1Current, p2Current;
+                    if (rec.isTiebreak) {
+                        p1Current = parseInt(parts[0], 10);
+                        p2Current = parseInt(parts[1], 10);
+                    } else {
+                        p1Current = revTennisMap[parts[0]] !== undefined ? revTennisMap[parts[0]] : parseInt(parts[0], 10);
+                        p2Current = revTennisMap[parts[1]] !== undefined ? revTennisMap[parts[1]] : parseInt(parts[1], 10);
+                    }
+
+                    var isWePoint = false;
+                    if (p1Current > p1Prev) isWePoint = true;
+                    else if (p2Current > p2Prev) isWePoint = false;
+                    else if (p1Current === 3 && p2Current === 3) {
+                        if (p2Prev === 4) isWePoint = true;
+                        else if (p1Prev === 4) isWePoint = false;
+                    }
+
+                    var display = rec.isTiebreak ? p1Current + '/' + p2Current : (tennisMap[p1Current] || p1Current) + '/' + (tennisMap[p2Current] || p2Current);
+                    var meta = rec.metadata && rec.metadata[j] ? ' (' + rec.metadata[j].toUpperCase() + ')' : '';
+                    var cls = isWePoint ? 'win-we' : 'win-them';
+                    var tbCls = rec.isTiebreak ? ' tiebreak-p' : '';
+                    pointsHtml += '<span class="p ' + cls + tbCls + '">' + display + meta + '</span>';
+
+                    p1Prev = p1Current;
+                    p2Prev = p2Current;
+                }
+            }
+        }
+        pointsHtml += '</div>';
+
+        var setBadge = rec.isTiebreak ? '<span class="badge badge-tiebreak">ТБ</span>' : '<span class="badge">С' + rec.set + '</span>';
+
+        var analysisLabel = rec.isTiebreak ? 'Тай-брейк' : (total <= 4 ? 'Легкий' : (total <= 6 ? 'Средний' : (total <= 9 ? 'Тяжелый' : 'Эпичный')));
+        var analysisCls = rec.isTiebreak ? 'tiebreak' : (total <= 4 ? 'easy-win' : (total <= 6 ? 'normal' : (total <= 9 ? 'hard' : 'epic')));
+        if (rec.isBreak) {
+            analysisLabel += ' 💜 Брейк';
+            analysisCls = 'break';
+        }
+        if (rec.breakPointSaved) {
+            analysisLabel += ' ✅ БП отыгран';
+        }
+
+        var winnerName = rec.winner === 1 ? (matchData?.player1 || 'Игрок 1') : (matchData?.player2 || 'Игрок 2');
+        var winnerClass = rec.winner === 1 ? 'win' : 'lose';
+
+        html += '<tr>' +
+            '<td><span class="badge">' + (i + 1) + '</span></td>' +
+            '<td>' + setBadge + '</td>' +
+            '<td><span class="game-badge ' + winnerClass + '">' + winnerName + '</span></td>' +
+            '<td><span class="game-badge">' + rec.first + ':' + rec.second + '</span></td>' +
+            '<td>' + pointsHtml + '</td>' +
+            '<td><span class="game-analysis ' + analysisCls + '">' + analysisLabel + ' (' + total + ' очк.)</span></td>' +
+        '</tr>';
+    }
+
+    tbody.innerHTML = html;
+}
+
+// ============================================
+// ИСТОРИЯ МАТЧЕЙ (локальная)
+// ============================================
+var matchHistory = [];
+
+function loadMatchHistory() {
+    try {
+        var saved = localStorage.getItem('tennisMatchHistoryCoach');
+        if (saved) {
+            matchHistory = JSON.parse(saved);
+        }
+    } catch (e) {
+        matchHistory = [];
+    }
+    renderMatchHistory();
+}
+
+function saveMatchHistory() {
+    try {
+        localStorage.setItem('tennisMatchHistoryCoach', JSON.stringify(matchHistory));
+    } catch (e) {
+        console.error('Ошибка сохранения истории:', e);
+    }
+}
+
+function renderMatchHistory() {
+    var listElement = document.getElementById('matchHistoryList');
+    if (!listElement) return;
+    if (matchHistory.length === 0) {
+        listElement.innerHTML = '<div class="history-empty">Нет завершенных матчей</div>';
+        return;
+    }
+    var html = '';
+    for (var i = 0; i < matchHistory.length; i++) {
+        var match = matchHistory[i];
+        var date = match.date || new Date().toLocaleString();
+        var duration = match.duration || '0:00';
+        var winner = match.winner || 'Неизвестно';
+        var isRetiredMatch = match.isRetired || false;
+        var winnerClass = 'win-draw';
+        var winnerDisplay = '🤝 ' + winner;
+        if (isRetiredMatch) {
+            winnerClass = 'win-retired';
+            var note = match.note || '';
+            winnerDisplay = '🚫 ' + winner + ' ' + note;
+        } else if (match.winnerType === 1) {
+            winnerClass = 'win-p1';
+            winnerDisplay = '🏆 ' + winner;
+        } else if (match.winnerType === 2) {
+            winnerClass = 'win-p2';
+            winnerDisplay = '🏆 ' + winner;
+        }
+        html += '<div class="match-history-item">' +
+            '<span class="match-result">' + (i + 1) + '. ' + match.result + '</span>' +
+            '<span class="match-winner ' + winnerClass + '">' + winnerDisplay + '</span>' +
+            '<span class="match-date">' + duration + ' • ' + date + '</span>' +
+            '<span class="match-delete" data-index="' + i + '">✕</span>' +
+        '</div>';
+    }
+    listElement.innerHTML = html;
+
+    var deleteButtons = document.querySelectorAll('.match-delete');
+    for (var d = 0; d < deleteButtons.length; d++) {
+        deleteButtons[d].addEventListener('click', function() {
+            var index = parseInt(this.getAttribute('data-index'), 10);
+            if (confirm('Удалить эту запись из истории?')) {
+                matchHistory.splice(index, 1);
+                saveMatchHistory();
+                renderMatchHistory();
+            }
+        });
+    }
+}
+
+document.getElementById('clearHistoryBtn').addEventListener('click', function() {
+    if (confirm('Вы уверены, что хотите очистить всю историю матчей?')) {
+        matchHistory = [];
+        saveMatchHistory();
+        renderMatchHistory();
+    }
+});
+
+loadMatchHistory();
+
+console.log('📊 Тренерский интерфейс запущен!');
+</script>
+</body>
+</html>
