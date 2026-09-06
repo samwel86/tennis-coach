@@ -594,33 +594,26 @@ const matchIdDisplay = document.getElementById('matchIdDisplay');
 const matchContent = document.getElementById('matchContent');
 
 // ============================================
-// ФУНКЦИИ ДЛЯ ФЛАГОВ (ЗАГРУЗКА ИЗ images/НАЗВАНИЕ_СТРАНЫ.svg)
+// ФУНКЦИИ ДЛЯ ФЛАГОВ (ОБНОВЛЕН ПУТЬ → images/flag/)
 // ============================================
 
 function getFlagUrl(countryCode) {
-    if (!countryCode) return 'images/default.svg';
-    // Приводим к нижнему регистру и берем первые 2 символа
+    if (!countryCode) return 'images/flag/default.svg';
     var code = countryCode.toLowerCase().trim();
-    // Если код состоит из 2 букв — используем его как имя файла
     if (code.length === 2) {
-        return 'images/' + code + '.svg';
+        return 'images/flag/' + code + '.svg';
     }
-    // Если это код UK → преобразуем в gb (стандарт)
-    if (code === 'uk') return 'images/gb.svg';
-    // Если код не 2 буквы, пробуем взять первые 2
+    if (code === 'uk') return 'images/flag/gb.svg';
     var short = code.slice(0, 2);
-    return 'images/' + short + '.svg';
+    return 'images/flag/' + short + '.svg';
 }
 
 function updateFlag(elementId, countryCode) {
     var el = document.getElementById(elementId);
     if (!el) return;
     var url = getFlagUrl(countryCode);
-    // Пробуем загрузить флаг
     el.style.backgroundImage = "url('" + url + "')";
-    // Убираем класс flag-default, чтобы не перекрывался background-image
     el.className = 'flag-icon';
-    // Добавляем обработчик ошибки загрузки
     el.onerror = function() {
         this.style.backgroundImage = "url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA5MDAgNjAwIj48cmVjdCB3aWR0aD0iOTAwIiBoZWlnaHQ9IjYwMCIgZmlsbD0iI2YwZjBmMCIvPjxjaXJjbGUgY3g9IjQ1MCIgY3k9IjMwMCIgcj0iMTUwIiBmaWxsPSIjY2NjY2NjIi8+PC9zdmc+')";
         this.className = 'flag-icon flag-default';
@@ -790,7 +783,7 @@ function updateUI(data) {
     if (gameP1Itf) gameP1Itf.textContent = p1Itf ? 'ITF: ' + p1Itf : 'ITF: --';
     if (gameP2Itf) gameP2Itf.textContent = p2Itf ? 'ITF: ' + p2Itf : 'ITF: --';
 
-    // Обновление флагов из images/
+    // Обновление флагов из images/flag/
     updateFlag('gameP1Flag', p1Flag);
     updateFlag('gameP2Flag', p2Flag);
 
